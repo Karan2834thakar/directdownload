@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDlWrapper } from "@/lib/ytdlp";
+import ytdl from "@distube/ytdl-core";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -11,52 +11,47 @@ export async function GET(request) {
   }
 
   try {
-    const ytdlp = await getDlWrapper();
+    // Validate YouTube URL
+    if (!ytdl.validateURL(targetUrl)) {
+      return NextResponse.json({ error: "Invalid YouTube URL provided." }, { status: 400 });
+    }
 
-    // Use robust yt-dlp arguments to bypass YouTube/Reels anti-bot checks
-    const flags = [
-      targetUrl,
-      "--dump-json",
-      "--no-warnings",
-      "--no-call-home",
-      "--no-check-certificates",
-      "--prefer-insecure",
-      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    ];
+    // Get video info using ytdl-core
+    const info = await ytdl.getInfo(targetUrl, {
+      requestOptions: {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        },
+      },
+    });
 
-    const rawInfo = await ytdlp.execPromise(flags);
-    const metadata = JSON.parse(rawInfo);
-
-    let downloadUrl = null;
-
-    if (metadata.formats && metadata.formats.length > 0) {
-      if (format === "audio") {
-        const audioFormat = metadata.formats.reverse().find(f => f.acodec !== "none" && f.url);
-        downloadUrl = audioFormat?.url;
-      } else {
-        const videoFormat = metadata.formats.reverse().find(f => f.vcodec !== "none" && f.url);
-        downloadUrl = videoFormat?.url;
+    let chosenFormat;
+    if (format === "audio") {
+      chosenFormat = ytdl.chooseFormat(info.formats, { quality: "highestaudio" });
+    } else {
+      // Pick highest quality format with both video and audio combined
+      chosenFormat = ytdl.chooseFormat(info.formats, { filter: "audioandvideo", quality: "highestvideo" });
+      
+      // Fallback if combined stream is unavailable
+      if (!chosenFormat) {
+        chosenFormat = ytdl.chooseFormat(info.formats, { quality: "highestvideo" });
       }
     }
 
-    if (!downloadUrl) {
-      downloadUrl = metadata.url || metadata.formats?.[0]?.url;
-    }
-
-    if (!downloadUrl) {
-      return NextResponse.json({ error: "Could not extract direct stream URL." }, { status: 404 });
+    if (!chosenFormat || !chosenFormat.url) {
+      return NextResponse.json({ error: "Could not find a valid stream URL for this video." }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
-      title: metadata.title || "Downloaded_Media",
-      downloadUrl: downloadUrl,
+      title: info.videoDetails.title || "YouTube_Video",
+      downloadUrl: chosenFormat.url,
     });
 
   } catch (error) {
-    console.error("yt-dlp execution error:", error);
+    console.error("YTDL Error:", error);
     return NextResponse.json(
-      { error: "Failed to process video link.", details: error?.message || String(error) },
+      { error: "YouTube blocked the server request. Try again in a moment.", details: error.message },
       { status: 500 }
     );
   }
