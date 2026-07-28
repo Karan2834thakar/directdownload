@@ -12,23 +12,27 @@ export async function GET(request) {
 
   try {
     const ytdlp = await getDlWrapper();
-    
-    // Extract metadata using yt-dlp binary
-    const metadata = await ytdlp.getVideoInfo([
+
+    // Use mweb client and user-agent impersonation to bypass YouTube bot checks
+    const flags = [
       targetUrl,
       "--no-warnings",
       "--no-call-home",
-    ]);
+      "--extractor-args", "youtube:player_client=mweb,android",
+      "--user-agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
+    ];
+
+    const metadata = await ytdlp.getVideoInfo(flags);
 
     let downloadUrl = null;
 
     if (metadata.formats && metadata.formats.length > 0) {
       if (format === "audio") {
-        const audioFormat = metadata.formats.reverse().find(f => f.acodec !== "none" && f.url);
+        const audioFormat = metadata.formats.slice().reverse().find(f => f.acodec !== "none" && f.url);
         downloadUrl = audioFormat?.url;
       } else {
-        const videoFormat = metadata.formats.reverse().find(f => f.vcodec !== "none" && f.url);
-        downloadUrl = videoFormat?.url;
+        const videoFormat = metadata.formats.slice().reverse().find(f => f.vcodec !== "none" && f.acodec !== "none" && f.url);
+        downloadUrl = videoFormat?.url || metadata.formats.slice().reverse().find(f => f.url)?.url;
       }
     }
 
@@ -37,7 +41,7 @@ export async function GET(request) {
     }
 
     if (!downloadUrl) {
-      return NextResponse.json({ error: "Could not extract playable stream URL." }, { status: 404 });
+      return NextResponse.json({ error: "Could not extract direct stream URL." }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -49,7 +53,7 @@ export async function GET(request) {
   } catch (error) {
     console.error("yt-dlp execution error:", error);
     return NextResponse.json(
-      { error: "Failed to process video link.", details: error.message },
+      { error: "Failed to process video link. Please try again or check URL.", details: error.message },
       { status: 500 }
     );
   }
