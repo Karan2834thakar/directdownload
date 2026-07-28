@@ -3,7 +3,7 @@ services:
     name: directdownload
     env: node
     plan: free
-    buildCommand: "apt-get update && apt-get install -y python3 ffmpeg && npm install && npm run build"
+    buildCommand: "npm install && npm run build"
     startCommand: "npm run start"
     envVars:
       - key: NODE_VERSION
