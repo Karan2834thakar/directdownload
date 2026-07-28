@@ -1,65 +1,141 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { Download, Sparkles, Video, Music, ShieldCheck, Zap } from "lucide-react";
 
 export default function Home() {
+  const [url, setUrl] = useState("");
+  const [format, setFormat] = useState("video");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDownload = async () => {
+    if (!url) return;
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`/api/download?url=${encodeURIComponent(url)}&format=${format}`);
+      const data = await res.json();
+
+      if (data.success && data.downloadUrl) {
+        // Trigger browser download directly from source link
+        const a = document.createElement("a");
+        a.href = data.downloadUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.download = data.title || "media";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        setError(data.error || "Failed to extract video link.");
+      }
+    } catch (err) {
+      setError("Server error or timeout. Please check link.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-between overflow-hidden font-sans selection:bg-blue-500 selection:text-white">
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-blue-600/30 to-purple-600/30 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
+
+      <header className="w-full max-w-6xl mx-auto px-6 py-6 flex justify-between items-center z-10">
+        <div className="flex items-center space-x-2 font-black text-xl tracking-wider text-white">
+          <div className="p-2 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-xl shadow-lg shadow-blue-500/20">
+            <Zap className="w-5 h-5 text-white" />
+          </div>
+          <span>STREAM<span className="text-blue-500">GRAB</span></span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        <div className="flex items-center space-x-4 text-xs font-semibold text-slate-400">
+          <span className="flex items-center gap-1 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-full">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" /> Fast & Safe
+          </span>
+        </div>
+      </header>
+
+      <section className="w-full max-w-4xl mx-auto px-6 py-12 flex flex-col items-center text-center z-10 my-auto">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 border border-slate-800 text-xs font-medium text-blue-400 mb-6 backdrop-blur-md shadow-inner">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Supports YouTube Shorts, Reels & TikTok</span>
+        </div>
+
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight">
+          Download Any Video or Audio <br />
+          <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+            Instantly in Seconds
+          </span>
+        </h1>
+
+        <p className="text-slate-400 text-sm md:text-base max-w-xl mb-10 leading-relaxed">
+          Paste any video or Instagram reel link below to extract high-quality MP4 video or pristine MP3 audio directly to your device.
+        </p>
+
+        <div className="w-full max-w-xl bg-slate-900/60 backdrop-blur-xl p-3 md:p-4 rounded-2xl border border-slate-800 shadow-2xl shadow-blue-950/40 hover:border-slate-700 transition-all">
+          <div className="flex flex-col md:flex-row gap-3">
+            <input 
+              type="text" 
+              placeholder="Paste Instagram Reel or YouTube URL..." 
+              value={url} 
+              onChange={(e) => setUrl(e.target.value)} 
+              className="flex-1 bg-slate-950/80 text-white placeholder-slate-500 text-sm rounded-xl px-4 py-3.5 border border-slate-800 focus:outline-none focus:border-blue-500/80 transition-all"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+            <select 
+              value={format} 
+              onChange={(e) => setFormat(e.target.value)}
+              className="bg-slate-950/80 text-slate-200 text-sm rounded-xl px-3 py-3.5 border border-slate-800 focus:outline-none focus:border-blue-500/80 cursor-pointer"
+            >
+              <option value="video">MP4 Video</option>
+              <option value="audio">MP3 Audio</option>
+            </select>
+
+            <button 
+              onClick={handleDownload} 
+              disabled={loading || !url}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-blue-600/30 transition-all transform active:scale-[0.98]"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Download</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {error && <p className="mt-3 text-red-400 text-xs text-center">{error}</p>}
         </div>
-      </main>
-    </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-16 text-left">
+          <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm">
+            <Video className="w-6 h-6 text-blue-400 mb-3" />
+            <h3 className="font-semibold text-white text-sm mb-1">High Quality</h3>
+            <p className="text-slate-400 text-xs leading-relaxed">Extracts the best possible media resolution available directly from source streams.</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm">
+            <Music className="w-6 h-6 text-purple-400 mb-3" />
+            <h3 className="font-semibold text-white text-sm mb-1">Instant Audio Extract</h3>
+            <p className="text-slate-400 text-xs leading-relaxed">Convert video reels straight into clean MP3 files with a single click.</p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm">
+            <ShieldCheck className="w-6 h-6 text-emerald-400 mb-3" />
+            <h3 className="font-semibold text-white text-sm mb-1">No Login Required</h3>
+            <p className="text-slate-400 text-xs leading-relaxed">100% private and secure. No accounts or personal data saved anywhere.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="w-full py-6 text-center text-xs text-slate-500 border-t border-slate-900/80 z-10">
+        <p>Built for fast media access.</p>
+      </footer>
+    </main>
   );
 }
