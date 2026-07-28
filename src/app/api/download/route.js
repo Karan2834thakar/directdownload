@@ -3,61 +3,42 @@ import { NextResponse } from "next/server";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get("url");
-  const format = searchParams.get("format") || "video";
 
   if (!targetUrl) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }
 
-  // Extract YouTube Video ID
-  const videoIdMatch = targetUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-  const videoId = videoIdMatch ? videoIdMatch[1] : null;
-
-  if (!videoId) {
-    return NextResponse.json({ error: "Invalid YouTube URL format." }, { status: 400 });
-  }
-
-  // Public Invidious and Piped instance gateways
-  const instances = [
-    `https://inv.tux.pizza/api/v1/videos/${videoId}`,
-    `https://invidious.nerdvpn.de/api/v1/videos/${videoId}`,
-    `https://pipedapi.kavin.rocks/streams/${videoId}`,
+  // Backup open-access scraper endpoints that rotate proxies automatically
+  const API_ENDPOINTS = [
+    `https://api.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`,
+    `https://downloader.freemedia.workers.dev/?url=${encodeURIComponent(targetUrl)}`,
   ];
 
-  for (const endpoint of instances) {
+  for (const endpoint of API_ENDPOINTS) {
     try {
       const res = await fetch(endpoint, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         },
-        next: { revalidate: 0 },
+        cache: "no-store",
       });
 
       if (!res.ok) continue;
 
       const data = await res.json();
-      let downloadUrl = null;
-      let title = data.title || "YouTube_Video";
 
-      // 1. Invidious format handling
-      if (data.formatStreams || data.adaptiveFormats) {
-        if (format === "audio") {
-          const audio = (data.adaptiveFormats || []).reverse().find(f => f.type?.includes("audio"));
-          downloadUrl = audio?.url;
-        } else {
-          const video = (data.formatStreams || []).reverse().find(f => f.url);
-          downloadUrl = video?.url;
-        }
-      } 
-      // 2. Piped format handling
-      else if (data.videoStreams || data.audioStreams) {
-        if (format === "audio") {
-          const audio = (data.audioStreams || []).reverse().find(f => f.url);
-          downloadUrl = audio?.url;
-        } else {
-          const video = (data.videoStreams || []).reverse().find(f => f.url);
-          downloadUrl = video?.url;
-        }
+      let downloadUrl = null;
+      let title = "Downloaded_Media";
+
+      // TikWM format response
+      if (data && data.data) {
+        downloadUrl = data.data.play || data.data.wmplay || data.data.music;
+        title = data.data.title || title;
+      }
+      // Freemedia worker format response
+      else if (data && data.url) {
+        downloadUrl = data.url;
+        title = data.title || title;
       }
 
       if (downloadUrl) {
@@ -67,14 +48,13 @@ export async function GET(request) {
           downloadUrl: downloadUrl,
         });
       }
-
     } catch (err) {
-      console.warn(`Gateway failed: ${endpoint}`, err.message);
+      console.warn(`Endpoint failed: ${endpoint}`, err.message);
     }
   }
 
   return NextResponse.json(
-    { error: "Media extraction gateways are currently rate-limited. Please retry in a few seconds." },
-    { status: 503 }
+    { error: "Could not extract stream URL. Please try again with a YouTube Short, Reel, or TikTok link." },
+    { status: 500 }
   );
 }
