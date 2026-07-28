@@ -1,52 +1,55 @@
 import { NextResponse } from "next/server";
+import { getDlWrapper } from "@/lib/ytdlp";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get("url");
+  const format = searchParams.get("format") || "video";
 
   if (!targetUrl) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }
 
   try {
-    // 1. Check if TikTok / Shorts / Reels URL and route to appropriate lightweight API
+    const ytdlp = await getDlWrapper();
+    
+    // Extract metadata using yt-dlp binary
+    const metadata = await ytdlp.getVideoInfo([
+      targetUrl,
+      "--no-warnings",
+      "--no-call-home",
+    ]);
+
     let downloadUrl = null;
-    let title = "Downloaded_Media";
 
-    // Call public extraction gateway
-    const res = await fetch(`https://api.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`);
-    const data = await res.json();
-
-    if (data && data.data) {
-      downloadUrl = data.data.play || data.data.wmplay || data.data.music;
-      title = data.data.title || "Media_File";
-    }
-
-    // Fallback: Direct metadata stream extraction fallback
-    if (!downloadUrl) {
-      const fallbackRes = await fetch(`https://api.vimeo.com/oembed.json?url=${encodeURIComponent(targetUrl)}`);
-      if (fallbackRes.ok) {
-        const fallbackData = await fallbackRes.json();
-        title = fallbackData.title || title;
+    if (metadata.formats && metadata.formats.length > 0) {
+      if (format === "audio") {
+        const audioFormat = metadata.formats.reverse().find(f => f.acodec !== "none" && f.url);
+        downloadUrl = audioFormat?.url;
+      } else {
+        const videoFormat = metadata.formats.reverse().find(f => f.vcodec !== "none" && f.url);
+        downloadUrl = videoFormat?.url;
       }
     }
 
     if (!downloadUrl) {
-      return NextResponse.json(
-        { error: "Could not extract stream. Please try a public YouTube Shorts, Reel, or TikTok link." },
-        { status: 404 }
-      );
+      downloadUrl = metadata.url || metadata.formats?.[0]?.url;
+    }
+
+    if (!downloadUrl) {
+      return NextResponse.json({ error: "Could not extract playable stream URL." }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
+      title: metadata.title || "Downloaded_Media",
       downloadUrl: downloadUrl,
-      title: title,
     });
 
   } catch (error) {
+    console.error("yt-dlp execution error:", error);
     return NextResponse.json(
-      { error: "Failed to process media request." },
+      { error: "Failed to process video link.", details: error.message },
       { status: 500 }
     );
   }
