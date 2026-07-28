@@ -7,7 +7,7 @@ const binaryPath = path.join(os.tmpdir(), "yt-dlp");
 
 export async function getDlWrapper() {
   if (!fs.existsSync(binaryPath)) {
-    console.log("Downloading yt-dlp binary to /tmp...");
+    console.log("Downloading latest yt-dlp binary...");
     await YTDLPWrapper.downloadFromGithub(binaryPath);
     fs.chmodSync(binaryPath, "755");
   }

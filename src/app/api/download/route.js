@@ -13,26 +13,29 @@ export async function GET(request) {
   try {
     const ytdlp = await getDlWrapper();
 
-    // Use mweb client and user-agent impersonation to bypass YouTube bot checks
+    // Use robust yt-dlp arguments to bypass YouTube/Reels anti-bot checks
     const flags = [
       targetUrl,
+      "--dump-json",
       "--no-warnings",
       "--no-call-home",
-      "--extractor-args", "youtube:player_client=mweb,android",
-      "--user-agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
+      "--no-check-certificates",
+      "--prefer-insecure",
+      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
     ];
 
-    const metadata = await ytdlp.getVideoInfo(flags);
+    const rawInfo = await ytdlp.execPromise(flags);
+    const metadata = JSON.parse(rawInfo);
 
     let downloadUrl = null;
 
     if (metadata.formats && metadata.formats.length > 0) {
       if (format === "audio") {
-        const audioFormat = metadata.formats.slice().reverse().find(f => f.acodec !== "none" && f.url);
+        const audioFormat = metadata.formats.reverse().find(f => f.acodec !== "none" && f.url);
         downloadUrl = audioFormat?.url;
       } else {
-        const videoFormat = metadata.formats.slice().reverse().find(f => f.vcodec !== "none" && f.acodec !== "none" && f.url);
-        downloadUrl = videoFormat?.url || metadata.formats.slice().reverse().find(f => f.url)?.url;
+        const videoFormat = metadata.formats.reverse().find(f => f.vcodec !== "none" && f.url);
+        downloadUrl = videoFormat?.url;
       }
     }
 
@@ -53,7 +56,7 @@ export async function GET(request) {
   } catch (error) {
     console.error("yt-dlp execution error:", error);
     return NextResponse.json(
-      { error: "Failed to process video link. Please try again or check URL.", details: error.message },
+      { error: "Failed to process video link.", details: error?.message || String(error) },
       { status: 500 }
     );
   }
