@@ -8,53 +8,53 @@ export async function GET(request) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
   }
 
-  // Backup open-access scraper endpoints that rotate proxies automatically
-  const API_ENDPOINTS = [
-    `https://api.tikwm.com/api/?url=${encodeURIComponent(targetUrl)}`,
-    `https://downloader.freemedia.workers.dev/?url=${encodeURIComponent(targetUrl)}`,
+  // Active public Cobalt instances that process YouTube, Shorts, Reels, and TikTok streams
+  const COBALT_INSTANCES = [
+    "https://cobalt-api.kwiatekmom.tokyo",
+    "https://api.cobalt.tools",
+    "https://cobalt.ar2.dev",
   ];
 
-  for (const endpoint of API_ENDPOINTS) {
+  for (const instance of COBALT_INSTANCES) {
     try {
-      const res = await fetch(endpoint, {
+      const response = await fetch(instance, {
+        method: "POST",
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
+        body: JSON.stringify({
+          url: targetUrl,
+          videoQuality: "max",
+        }),
         cache: "no-store",
       });
 
-      if (!res.ok) continue;
+      if (!response.ok) continue;
 
-      const data = await res.json();
+      const data = await response.json();
 
-      let downloadUrl = null;
-      let title = "Downloaded_Media";
-
-      // TikWM format response
-      if (data && data.data) {
-        downloadUrl = data.data.play || data.data.wmplay || data.data.music;
-        title = data.data.title || title;
-      }
-      // Freemedia worker format response
-      else if (data && data.url) {
-        downloadUrl = data.url;
-        title = data.title || title;
-      }
-
-      if (downloadUrl) {
+      if (data.status === "tunnel" || data.status === "redirect") {
         return NextResponse.json({
           success: true,
-          title: title,
-          downloadUrl: downloadUrl,
+          title: data.filename || "Downloaded_Media",
+          downloadUrl: data.url,
+        });
+      } else if (data.status === "picker" && data.picker && data.picker.length > 0) {
+        return NextResponse.json({
+          success: true,
+          title: "Downloaded_Media",
+          downloadUrl: data.picker[0].url,
         });
       }
     } catch (err) {
-      console.warn(`Endpoint failed: ${endpoint}`, err.message);
+      console.warn(`Cobalt instance failed: ${instance}`, err.message);
     }
   }
 
   return NextResponse.json(
-    { error: "Could not extract stream URL. Please try again with a YouTube Short, Reel, or TikTok link." },
+    { error: "Could not resolve stream URL. Please verify the media link and try again." },
     { status: 500 }
   );
 }
